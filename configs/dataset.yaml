@@ -1,0 +1,53 @@
+# ── Dataset Configuration ───────────────────────────────────────────────────
+
+cubicasa:
+  # Categories and their folder names in the dataset root
+  categories:
+    - colorful
+    - high_quality
+    - high_quality_architectural
+
+  # Which PNG to use from each subfolder
+  # F1_scaled.png is preferred: already normalized, consistent resolution
+  image_filename: "F1_scaled.png"
+  annotation_filename: "model.svg"
+
+# ── Subset Selection ────────────────────────────────────────────────────────
+selection:
+  total: 500                # Start here; change to 5000 for full dataset
+  seed: 42                  # Fixed seed = reproducible selection every time
+  strategy: proportional    # Options: proportional | balanced | random
+
+# ── Quality Filters ─────────────────────────────────────────────────────────
+# Folders not meeting these criteria are excluded before selection
+filters:
+  min_image_width: 512
+  min_image_height: 512
+  min_annotations_per_image: 3   # Skip nearly-empty floor plans
+  require_svg: true
+
+# ── Train / Val / Test Split ────────────────────────────────────────────────
+split:
+  train: 0.70
+  val:   0.15
+  test:  0.15
+
+# ── Target Classes ──────────────────────────────────────────────────────────
+# Order matters: index = class_id used in YOLO label files
+classes:
+  0: Door
+  1: Window
+  2: Wall
+  3: Staircase
+  4: Toilet
+  5: Sink
+
+# SVG element tag names that map to each class
+# (verify these against actual SVG files in Phase 1)
+svg_class_tags:
+  Door:      ["Door"]
+  Window:    ["Window"]
+  Wall:      ["Wall"]
+  Staircase: ["Staircase", "Stairs"]
+  Toilet:    ["Toilet", "Bathroom"]
+  Sink:      ["Sink", "Bathtub"]
