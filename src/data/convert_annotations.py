@@ -231,6 +231,12 @@ def compose_matrices(
         b2 * e1 + d2 * f1 + f2,
     )
 
+
+# SVG elements whose subtrees contain only rendering definitions,
+# never actual spatial geometry. Skipping them prevents arrowhead
+# marker polygons (with near-zero local coords) from corrupting bboxes.
+_DEFINITION_TAGS = frozenset({"defs", "symbol", "clipPath", "mask", "marker"})
+
 # Classes that represent visual markers, arrows, labels — NOT structural geometry.
 # These are excluded from bounding box calculations to prevent direction arrows
 # (which have local near-zero coordinates) from expanding bbox to wrong areas.
@@ -245,44 +251,35 @@ def collect_recursive(
     base_accumulated: tuple | None,
     skip_classes: frozenset | None = None,
 ) -> list[tuple[float, float]]:
-    """
-    Recursively collect geometry coordinates from all descendants of elem,
-    accumulating transforms level-by-level at each node.
-
-    Args:
-        elem:             Root element to collect from.
-        base_accumulated: Full transform chain from SVG root to elem.
-        skip_classes:     Optional set of class keywords. Any <g> whose
-                          class attribute contains one of these keywords
-                          is skipped entirely (including its subtree).
-                          Used to exclude direction arrows from Stairs.
-
-    Handles: <polygon>, <polyline>, <rect>, <path>
-    Each polygon gets the correct per-level transform chain applied.
-    """
     all_coords: list[tuple[float, float]] = []
 
     def descend(current: ET.Element, current_acc: tuple | None) -> None:
         for child in current:
+            tag = strip_ns(child.tag)
+
+            # ── NEW: skip SVG definition containers entirely ──────────────
+            # <defs>, <marker>, <symbol> etc. contain rendering definitions
+            # (arrowheads, patterns, clip regions), never actual geometry.
+            # The staircase direction arrow marker lives inside <defs> and
+            # has polygon coordinates near (0,0), corrupting the bbox.
+            if tag in _DEFINITION_TAGS:
+                continue
+            # ─────────────────────────────────────────────────────────────
+
             child_t   = parse_matrix_transform(child.get("transform", ""))
             child_acc = compose_matrices(current_acc, child_t)
 
-            tag = strip_ns(child.tag)
-
-            # Skip noise groups (direction arrows, labels, etc.)
             if tag == "g" and skip_classes:
                 child_class_words = set(child.get("class", "").split())
                 if child_class_words & skip_classes:
                     continue
 
-            # Extract coordinates from this element if it's a geometry primitive
             coords = get_element_coords(child)
             if coords:
                 if child_acc:
                     coords = apply_matrix(coords, child_acc)
                 all_coords.extend(coords)
 
-            # Always recurse into children (even geometry elements can have children)
             descend(child, child_acc)
 
     descend(elem, base_accumulated)
