@@ -83,6 +83,60 @@ def parse_points(points_str: str) -> list[tuple[float, float]]:
         return []
 
 
+def get_element_coords(elem: ET.Element) -> list[tuple[float, float]]:
+    """
+    Extract (x, y) coordinate pairs from any SVG geometry element.
+
+    Handles three element types:
+      <polygon>/<polyline> — coordinates in 'points' attribute
+      <rect>               — corners computed from x, y, width, height
+      <path>               — numbers extracted from 'd' attribute
+
+    Why path extraction works for bounding boxes:
+    We extract ALL floating-point numbers from the path 'd' attribute
+    and treat consecutive pairs as (x, y). H (horizontal) and V (vertical)
+    single-coordinate commands may slightly misalign pairings, but the
+    resulting min/max range across all numbers still correctly bounds the
+    shape. For a toilet bowl path like "M40,44 S41,70 20,70 C-0.5,70..."
+    this gives x:[-0.5, 41], y:[18, 70] — an accurate bounding box.
+    """
+    tag = strip_ns(elem.tag)
+
+    if tag in ("polygon", "polyline"):
+        return parse_points(elem.get("points", ""))
+
+    if tag == "rect":
+        try:
+            x = float(elem.get("x", 0))
+            y = float(elem.get("y", 0))
+            w = float(elem.get("width", 0))
+            h = float(elem.get("height", 0))
+            if w > 0 and h > 0:
+                return [(x, y), (x + w, y), (x + w, y + h), (x, y + h)]
+        except (ValueError, TypeError):
+            pass
+
+    if tag == "path":
+        d = elem.get("d", "")
+        if d:
+            # Remove all SVG command letters, leaving only numbers
+            nums_str = re.sub(r"[MmLlHhVvCcSsQqTtAaZz]", " ", d)
+            try:
+                nums = [
+                    float(n)
+                    for n in nums_str.replace(",", " ").split()
+                    if n
+                ]
+                # Pair consecutive numbers as (x, y) — good enough for bbox
+                return [
+                    (nums[i], nums[i + 1])
+                    for i in range(0, len(nums) - 1, 2)
+                ]
+            except (ValueError, IndexError):
+                pass
+
+    return []
+
 def coords_to_bbox(
     coords: list[tuple[float, float]]
 ) -> tuple[float, float, float, float] | None:
@@ -177,55 +231,59 @@ def compose_matrices(
         b2 * e1 + d2 * f1 + f2,
     )
 
+# Classes that represent visual markers, arrows, labels — NOT structural geometry.
+# These are excluded from bounding box calculations to prevent direction arrows
+# (which have local near-zero coordinates) from expanding bbox to wrong areas.
+_NOISE_CLASSES = frozenset({
+    "Direction", "Arrow", "Name", "Label",
+    "Text", "North", "Dimension", "SelectionControls",
+})
+
+
 def collect_recursive(
     elem: ET.Element,
     base_accumulated: tuple | None,
+    skip_classes: frozenset | None = None,
 ) -> list[tuple[float, float]]:
     """
-    Recursively collect ALL polygon coordinates from all descendants of elem,
-    accumulating transforms level-by-level as we descend the tree.
-
-    WHY this fixes the "large bounding box" problem from before:
-    The previous approach applied ONE accumulated_transform uniformly to
-    ALL descendant polygon points. This was wrong for polygons inside
-    sub-groups that carry their OWN intermediate transforms (e.g. direction
-    arrows inside a Stairs element have local coordinates in their own
-    sub-group space). Applying the parent Stairs transform to those local
-    coords produced wildly incorrect positions.
-
-    This function instead computes the correct full transform chain from
-    SVG root to EACH INDIVIDUAL POLYGON, so every polygon gets precisely
-    the right transform applied — no more, no less.
+    Recursively collect geometry coordinates from all descendants of elem,
+    accumulating transforms level-by-level at each node.
 
     Args:
-        elem:             The element whose descendants to collect from.
-        base_accumulated: Transform already accumulated from SVG root
-                          to elem (NOT including elem's own transform —
-                          that was already factored in by the caller).
+        elem:             Root element to collect from.
+        base_accumulated: Full transform chain from SVG root to elem.
+        skip_classes:     Optional set of class keywords. Any <g> whose
+                          class attribute contains one of these keywords
+                          is skipped entirely (including its subtree).
+                          Used to exclude direction arrows from Stairs.
 
-    Returns:
-        List of (x, y) tuples in SVG canvas coordinates.
+    Handles: <polygon>, <polyline>, <rect>, <path>
+    Each polygon gets the correct per-level transform chain applied.
     """
     all_coords: list[tuple[float, float]] = []
 
     def descend(current: ET.Element, current_acc: tuple | None) -> None:
         for child in current:
-            # Compute the accumulated transform for this specific child
             child_t   = parse_matrix_transform(child.get("transform", ""))
             child_acc = compose_matrices(current_acc, child_t)
 
             tag = strip_ns(child.tag)
 
-            if tag == "polygon":
-                pts = parse_points(child.get("points", ""))
-                if pts:
-                    # Apply the FULL transform chain for this polygon
-                    if child_acc:
-                        pts = apply_matrix(pts, child_acc)
-                    all_coords.extend(pts)
-            else:
-                # Recurse into all non-polygon children (groups, paths, etc.)
-                descend(child, child_acc)
+            # Skip noise groups (direction arrows, labels, etc.)
+            if tag == "g" and skip_classes:
+                child_class_words = set(child.get("class", "").split())
+                if child_class_words & skip_classes:
+                    continue
+
+            # Extract coordinates from this element if it's a geometry primitive
+            coords = get_element_coords(child)
+            if coords:
+                if child_acc:
+                    coords = apply_matrix(coords, child_acc)
+                all_coords.extend(coords)
+
+            # Always recurse into children (even geometry elements can have children)
+            descend(child, child_acc)
 
     descend(elem, base_accumulated)
     return all_coords
@@ -300,22 +358,18 @@ def extract_stairs_bbox(
     accumulated_transform: tuple | None = None,
 ) -> tuple | None:
     """
-    Stairs: collect polygon coords from ALL descendants with proper
-    per-level transform accumulation.
+    Stairs: collect all descendant polygon coords, skipping noise groups.
 
-    Why all descendants (not just Steps children):
-    The SVG structure has <g class="Steps"> as SIBLINGS of <g class="Stairs">,
-    not children of it. The Stairs boundary is encoded in polygons inside
-    the Stairs element's own subtree. We collect all of them to capture
-    the complete staircase area.
-
-    Why NOT the old single-transform approach:
-    Applying one uniform accumulated_transform to ALL descendant polygon
-    points was wrong because sub-groups (direction arrows, etc.) carry
-    their own intermediate transforms. collect_recursive applies the
-    correct per-level chain to each polygon individually.
+    The _NOISE_CLASSES filter specifically excludes <g class="Direction">
+    elements which contain direction arrow polygons with local near-zero
+    coordinates. Without this filter, those arrow coords pull the bounding
+    box toward the top-left corner of the image.
     """
-    all_coords = collect_recursive(elem, accumulated_transform)
+    all_coords = collect_recursive(
+        elem,
+        accumulated_transform,
+        skip_classes=_NOISE_CLASSES,
+    )
     return coords_to_bbox(all_coords) if all_coords else None
 
 def find_boundary_polygon(
@@ -323,18 +377,14 @@ def find_boundary_polygon(
     base_accumulated: tuple | None,
 ) -> tuple | None:
     """
-    Recursively search all descendants of elem for a group with
-    class="BoundaryPolygon", accumulating intermediate transforms.
+    Recursively search all descendants of elem for class="BoundaryPolygon".
+    Collects coordinates from ALL geometry children (polygon, rect, path).
 
-    Why recursive: Some SVG structures nest BoundaryPolygon inside
-    intermediate wrapper groups. A flat direct-child search misses these,
-    causing 24-27% of furniture elements to return no bounding box.
-
-    Returns (x_min, y_min, x_max, y_max) in canvas coordinates, or None.
-
-    Args:
-        elem:             The furniture element to search within.
-        base_accumulated: Transform accumulated from SVG root to elem.
+    Why all geometry types: CubiCasa5k furniture elements use different
+    geometry inside BoundaryPolygon depending on the fixture type:
+      - Simple fixtures (sink, square toilet): <polygon>
+      - Complex fixtures (rounded toilet, bathtub): <rect> + <path>
+    Supporting only <polygon> caused ~164 toilets to be skipped.
     """
     def search(
         current: ET.Element,
@@ -345,22 +395,25 @@ def find_boundary_polygon(
             if strip_ns(child.tag) != "g":
                 continue
 
-            # Accumulate this child's own transform
             child_t   = parse_matrix_transform(child.get("transform", ""))
             child_acc = compose_matrices(current_acc, child_t)
 
             if "BoundaryPolygon" in child.get("class", "").split():
-                # Found the boundary polygon group — get first polygon inside
-                for polygon in child:
-                    if strip_ns(polygon.tag) == "polygon":
-                        pts = parse_points(polygon.get("points", ""))
-                        if pts:
-                            if child_acc:
-                                pts = apply_matrix(pts, child_acc)
-                            return coords_to_bbox(pts)
-                # BoundaryPolygon group exists but contains no polygon — keep searching
+                # Found BoundaryPolygon — collect coords from ALL geometry children
+                all_pts: list[tuple[float, float]] = []
 
-            # Recurse into this child to look deeper
+                for geom_elem in child:
+                    pts = get_element_coords(geom_elem)
+                    if pts:
+                        if child_acc:
+                            pts = apply_matrix(pts, child_acc)
+                        all_pts.extend(pts)
+
+                if all_pts:
+                    return coords_to_bbox(all_pts)
+                # BoundaryPolygon exists but all children had no parseable coords
+
+            # Recurse deeper
             result = search(child, child_acc)
             if result is not None:
                 return result
