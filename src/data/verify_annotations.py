@@ -1,5 +1,5 @@
 """
-Annotation Verification Script — Phase 2
+Annotation Verification Script — Phase 2 Step 2 (verification)
 
 PURPOSE:
     Visually verify that converted YOLO annotations are correctly
@@ -117,7 +117,7 @@ def draw_annotations(img_path: Path, label_path: Path, class_names: dict) -> Non
             continue
 
     # ── Save to verify directory ──────────────────────────────────────────
-    verify_dir = Path("data/verify")
+    verify_dir = Path("data/verify/annotated")
     verify_dir.mkdir(exist_ok=True)
     out_path = verify_dir / img_path.name
 
@@ -171,7 +171,7 @@ def main():
         label_path = labels_dir / (img_path.stem + ".txt")
         draw_annotations(img_path, label_path, class_names)
 
-    verify_dir = Path("data/verify")
+    verify_dir = Path("data/verify/annotated")
     logger.info(f"\n✓ Verification complete!")
     logger.info(f"  Annotated images saved to: {verify_dir}/")
     logger.info(f"  Sample count: {len(sample)}")

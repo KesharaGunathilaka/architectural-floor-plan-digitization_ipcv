@@ -1,5 +1,5 @@
 """
-Annotation Conversion Script — Phase 2
+Annotation Conversion Script — Phase 2 Step 1
 
 PURPOSE:
     Convert CubiCasa5k SVG annotations → YOLO .txt label files.
