@@ -35,6 +35,7 @@ import sys
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
+import cv2
 from tqdm import tqdm
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -484,6 +485,8 @@ def extract_annotations(
     svg_path: Path,
     class_id_map: dict[str, int],
     svg_class_tags: dict[str, list[str]],
+    override_width: float | None = None,
+    override_height: float | None = None,
 ) -> tuple[list[str], dict]:
     """
     Parse one SVG file and extract all YOLO-format annotations.
@@ -492,6 +495,13 @@ def extract_annotations(
     Each element is processed with the full transform chain from root to
     that element, ensuring furniture positioned by ancestor transforms is
     correctly located.
+
+    Args:
+        svg_path: Path to SVG file
+        class_id_map: Mapping of class names to IDs
+        svg_class_tags: Mapping of class names to SVG keywords
+        override_width: If provided, use this width instead of SVG dimensions
+        override_height: If provided, use this height instead of SVG dimensions
     """
     yolo_lines = []
     stats = {
@@ -511,6 +521,13 @@ def extract_annotations(
         logger.warning(f"Cannot determine SVG dimensions: {svg_path}")
         return yolo_lines, stats
     svg_w, svg_h = svg_dims
+
+    # ── Use actual image dimensions if provided (fixes alignment) ────────
+    if override_width is not None:
+        svg_w = override_width
+    if override_height is not None:
+        svg_h = override_height
+    # ───────────────────────────────────────────────────────────────────
 
     # Reverse lookup: SVG keyword → (class_name, class_id)
     keyword_to_class: dict[str, tuple[str, int]] = {}
@@ -615,9 +632,10 @@ def process_split(
     Process all folders in one split (train/val/test).
 
     For each folder:
-      1. Build a unique output filename from category + folder name
-      2. Copy PNG → yolo_images_dir
-      3. Extract annotations from SVG → write .txt to yolo_labels_dir
+      1. Get actual image dimensions
+      2. Build a unique output filename from category + folder name
+      3. Copy PNG → yolo_images_dir
+      4. Extract annotations from SVG → write .txt to yolo_labels_dir
 
     Returns aggregate statistics for reporting.
     """
@@ -652,9 +670,21 @@ def process_split(
             agg_stats["skipped_no_img"] += 1
             continue
 
-        # ── Extract annotations ───────────────────────────────────────────
+        # ── GET ACTUAL IMAGE DIMENSIONS (fixes annotation alignment) ──────
+        img = cv2.imread(str(img_path))
+        if img is None:
+            logger.debug(f"Cannot read image: {img_path}")
+            agg_stats["skipped_no_img"] += 1
+            continue
+
+        actual_h, actual_w = img.shape[:2]
+        # ───────────────────────────────────────────────────────────────
+
+        # ── Extract annotations with actual image dimensions ──────────────
         yolo_lines, stats = extract_annotations(
-            svg_path, class_id_map, svg_class_tags
+            svg_path, class_id_map, svg_class_tags,
+            override_width=float(actual_w),
+            override_height=float(actual_h),
         )
 
         # Skip folders with zero valid annotations
