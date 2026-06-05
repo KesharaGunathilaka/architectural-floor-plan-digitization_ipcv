@@ -14,7 +14,7 @@ cubicasa:
  
 # ── Subset Selection ────────────────────────────────────────────────────────
 selection:
-  total: 500                # Start here; change to 5000 for full dataset
+  total: 5000               # Full dataset for maximum training data
   seed: 42                  # Fixed seed = reproducible selection every time
   strategy: proportional    # Options: proportional | balanced | random
 
