@@ -20,12 +20,12 @@ ENV/
 *.ipynb_checkpoints
 
 # ── Data — never commit raw dataset or processed files
-data/
-data/raw/*
-data/processed/*
-data/yolo_dataset/images/
-data/yolo_dataset/labels/
-!data/**/.gitkeep
+/data/
+/data/raw/*
+/data/processed/*
+/data/yolo_dataset/images/
+/data/yolo_dataset/labels/
+!/data/**/.gitkeep
 
 # ── Model Weights & Training Artifacts ──────────────
 runs/
@@ -60,3 +60,7 @@ desktop.ini
 .coverage
 htmlcov/
 .pytest_cache/
+
+# git
+.github/
+.gitkeep
