@@ -76,9 +76,7 @@ def draw_annotations(img_path: Path, label_path: Path, class_names: dict) -> Non
             continue
 
         try:
-
             cls_id = int(parts[0])
-
             x_c, y_c, bw, bh = map(float, parts[1:])
 
             # Convert normalized YOLO coords back to pixel coords
@@ -94,17 +92,14 @@ def draw_annotations(img_path: Path, label_path: Path, class_names: dict) -> Non
             x2 = max(0, min(x2, w - 1))
             y2 = max(0, min(y2, h - 1))
 
-
             color = CLASS_COLORS.get(cls_id, (128, 128, 128))
             cls_name = class_names.get(cls_id, str(cls_id))
-
 
             # Draw bounding box
             cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
 
             # Draw class label above the box
             cv2.putText(
-
                 img,
                 cls_name,
                 (x1, max(y1 - 5, 12)),
@@ -122,8 +117,7 @@ def draw_annotations(img_path: Path, label_path: Path, class_names: dict) -> Non
             continue
 
     # ── Save to verify directory ──────────────────────────────────────────
-    verify_dir = Path("data/verify/annotated")
-
+    verify_dir = Path("data/verify/preprocessed")
     verify_dir.mkdir(exist_ok=True)
     out_path = verify_dir / img_path.name
 
@@ -136,13 +130,11 @@ def main():
     load_env()
 
     dataset_config = load_config("configs/dataset.yaml")
-
     class_names = {int(idx): name for idx, name in dataset_config["classes"].items()}
 
-
     # Gather all training images that have a corresponding label
-    images_dir = Path("data/yolo_dataset/images/train")
-    labels_dir = Path("data/yolo_dataset/labels/train")
+    images_dir = Path("data/yolo_dataset_processed/images/train")
+    labels_dir = Path("data/yolo_dataset_processed/labels/train")
 
     if not images_dir.exists():
         logger.error(
@@ -161,9 +153,7 @@ def main():
         sys.exit(1)
 
     # Filter to only images with corresponding label files
-
     paired = [img for img in all_images if (labels_dir / (img.stem + ".txt")).exists()]
-
 
     if not paired:
         logger.error(
@@ -181,9 +171,7 @@ def main():
         label_path = labels_dir / (img_path.stem + ".txt")
         draw_annotations(img_path, label_path, class_names)
 
-
-    verify_dir = Path("data/verify/annotated")
-
+    verify_dir = Path("data/verify/preprocessed")
     logger.info(f"\n✓ Verification complete!")
     logger.info(f"  Annotated images saved to: {verify_dir}/")
     logger.info(f"  Sample count: {len(sample)}")

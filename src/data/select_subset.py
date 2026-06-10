@@ -161,7 +161,7 @@ def assign_splits(
         splits["test"].extend(shuffled[n_train + n_val:])
 
         logger.info(
-            f"{cat} split → "
+            f"{cat} split -> "
             f"train:{n_train}  val:{n_val}  test:{n_test}"
         )
 
@@ -206,7 +206,7 @@ def save_splits(
     master_path = splits_dir / "selected_folders.json"
     with open(master_path, "w") as f:
         json.dump(selection_record, f, indent=2)
-    logger.info(f"Master selection saved → {master_path}")
+    logger.info(f"Master selection saved -> {master_path}")
 
     # ── Individual split files ────────────────────────────────────────────
     for split_name, folder_list in splits.items():
@@ -218,7 +218,7 @@ def save_splits(
                 f, indent=2
             )
         logger.info(
-            f"{split_name}.json saved → {len(folder_list)} folders"
+            f"{split_name}.json saved -> {len(folder_list)} folders"
         )
 
 
@@ -233,7 +233,7 @@ def print_final_summary(splits: dict[str, list[str]]) -> None:
     print(f"  {'TOTAL':<8}: {total:>4} folders")
     print("=" * 50)
     print("\nOutput files:")
-    print("  data/splits/selected_folders.json  ← commit this to Git")
+    print("  data/splits/selected_folders.json  <- commit this to Git")
     print("  data/splits/train.json")
     print("  data/splits/val.json")
     print("  data/splits/test.json")
