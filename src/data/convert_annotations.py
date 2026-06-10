@@ -1,5 +1,5 @@
 """
-Annotation Conversion Script — Phase 2
+Annotation Conversion Script — Phase 2 Step 1
 
 PURPOSE:
     Convert CubiCasa5k SVG annotations → YOLO .txt label files.
@@ -49,12 +49,13 @@ logger = get_logger(__name__)
 # Which keywords use Pattern A (direct coordinates)
 STRUCTURAL_KEYWORDS = {"Door", "Window", "Wall"}
 # Which keywords use Pattern B (local coords + matrix transform)
-FURNITURE_KEYWORDS  = {"Toilet", "Sink"}
+FURNITURE_KEYWORDS = {"Toilet", "Sink"}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Low-level geometry helpers
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def strip_ns(tag: str) -> str:
     """Remove XML namespace prefix. '{http://...}polygon' → 'polygon'"""
@@ -123,23 +124,17 @@ def get_element_coords(elem: ET.Element) -> list[tuple[float, float]]:
             # Remove all SVG command letters, leaving only numbers
             nums_str = re.sub(r"[MmLlHhVvCcSsQqTtAaZz]", " ", d)
             try:
-                nums = [
-                    float(n)
-                    for n in nums_str.replace(",", " ").split()
-                    if n
-                ]
+                nums = [float(n) for n in nums_str.replace(",", " ").split() if n]
                 # Pair consecutive numbers as (x, y) — good enough for bbox
-                return [
-                    (nums[i], nums[i + 1])
-                    for i in range(0, len(nums) - 1, 2)
-                ]
+                return [(nums[i], nums[i + 1]) for i in range(0, len(nums) - 1, 2)]
             except (ValueError, IndexError):
                 pass
 
     return []
 
+
 def coords_to_bbox(
-    coords: list[tuple[float, float]]
+    coords: list[tuple[float, float]],
 ) -> tuple[float, float, float, float] | None:
     """
     Compute axis-aligned bounding box from a list of (x, y) points.
@@ -178,8 +173,7 @@ def parse_matrix_transform(transform_str: str) -> tuple | None:
 
 
 def apply_matrix(
-    coords: list[tuple[float, float]],
-    matrix: tuple
+    coords: list[tuple[float, float]], matrix: tuple
 ) -> list[tuple[float, float]]:
     """
     Apply a 2D affine matrix transform to a list of (x, y) points.
@@ -191,9 +185,10 @@ def apply_matrix(
     a, b, c, d, e, f = matrix
     return [(a * x + c * y + e, b * x + d * y + f) for x, y in coords]
 
+
 def compose_matrices(
     parent_m: tuple | None,
-    child_m:  tuple | None,
+    child_m: tuple | None,
 ) -> tuple | None:
     """
     Compose two affine matrix transforms into one.
@@ -241,10 +236,18 @@ _DEFINITION_TAGS = frozenset({"defs", "symbol", "clipPath", "mask", "marker"})
 # Classes that represent visual markers, arrows, labels — NOT structural geometry.
 # These are excluded from bounding box calculations to prevent direction arrows
 # (which have local near-zero coordinates) from expanding bbox to wrong areas.
-_NOISE_CLASSES = frozenset({
-    "Direction", "Arrow", "Name", "Label",
-    "Text", "North", "Dimension", "SelectionControls",
-})
+_NOISE_CLASSES = frozenset(
+    {
+        "Direction",
+        "Arrow",
+        "Name",
+        "Label",
+        "Text",
+        "North",
+        "Dimension",
+        "SelectionControls",
+    }
+)
 
 
 def collect_recursive(
@@ -267,7 +270,7 @@ def collect_recursive(
                 continue
             # ─────────────────────────────────────────────────────────────
 
-            child_t   = parse_matrix_transform(child.get("transform", ""))
+            child_t = parse_matrix_transform(child.get("transform", ""))
             child_acc = compose_matrices(current_acc, child_t)
 
             if tag == "g" and skip_classes:
@@ -285,6 +288,7 @@ def collect_recursive(
 
     descend(elem, base_accumulated)
     return all_coords
+
 
 def bbox_to_yolo(
     bbox: tuple[float, float, float, float],
@@ -319,8 +323,8 @@ def bbox_to_yolo(
 
     x_center = (x_min + x_max) / 2.0 / svg_w
     y_center = (y_min + y_max) / 2.0 / svg_h
-    w_norm   = box_w / svg_w
-    h_norm   = box_h / svg_h
+    w_norm = box_w / svg_w
+    h_norm = box_h / svg_h
 
     return x_center, y_center, w_norm, h_norm
 
@@ -328,6 +332,7 @@ def bbox_to_yolo(
 # ─────────────────────────────────────────────────────────────────────────────
 # Bounding box extraction — Pattern A and Pattern B
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def extract_structural_bbox(
     elem: ET.Element,
@@ -370,6 +375,7 @@ def extract_stairs_bbox(
     )
     return coords_to_bbox(all_coords) if all_coords else None
 
+
 def find_boundary_polygon(
     elem: ET.Element,
     base_accumulated: tuple | None,
@@ -384,6 +390,7 @@ def find_boundary_polygon(
       - Complex fixtures (rounded toilet, bathtub): <rect> + <path>
     Supporting only <polygon> caused ~164 toilets to be skipped.
     """
+
     def search(
         current: ET.Element,
         current_acc: tuple | None,
@@ -393,7 +400,7 @@ def find_boundary_polygon(
             if strip_ns(child.tag) != "g":
                 continue
 
-            child_t   = parse_matrix_transform(child.get("transform", ""))
+            child_t = parse_matrix_transform(child.get("transform", ""))
             child_acc = compose_matrices(current_acc, child_t)
 
             if "BoundaryPolygon" in child.get("class", "").split():
@@ -419,6 +426,7 @@ def find_boundary_polygon(
         return None
 
     return search(elem, base_accumulated)
+
 
 def extract_furniture_bbox(
     elem: ET.Element,
@@ -447,9 +455,11 @@ def extract_furniture_bbox(
     all_coords = collect_recursive(elem, accumulated_transform)
     return coords_to_bbox(all_coords) if all_coords else None
 
+
 # ─────────────────────────────────────────────────────────────────────────────
 # SVG annotation extractor
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def get_svg_dimensions(root: ET.Element) -> tuple[float, float] | None:
     """
@@ -462,7 +472,7 @@ def get_svg_dimensions(root: ET.Element) -> tuple[float, float] | None:
     and are used as the normalization denominator for YOLO format.
     """
     try:
-        width  = float(root.get("width",  0))
+        width = float(root.get("width", 0))
         height = float(root.get("height", 0))
         if width > 0 and height > 0:
             return width, height
@@ -505,7 +515,7 @@ def extract_annotations(
     """
     yolo_lines = []
     stats = {
-        "found":   {cls: 0 for cls in class_id_map},
+        "found": {cls: 0 for cls in class_id_map},
         "skipped": {cls: 0 for cls in class_id_map},
     }
 
@@ -550,24 +560,24 @@ def extract_annotations(
         tag = strip_ns(elem.tag)
 
         # Accumulate this element's own transform
-        my_transform  = parse_matrix_transform(elem.get("transform", ""))
+        my_transform = parse_matrix_transform(elem.get("transform", ""))
         new_accumulated = compose_matrices(accumulated, my_transform)
 
         if tag == "g":
-            class_str   = elem.get("class", "")
-            id_str      = elem.get("id",    "")
+            class_str = elem.get("class", "")
+            id_str = elem.get("id", "")
             class_words = set(class_str.split())
 
             # Check if this element matches any target class
             matched_class_name = None
-            matched_class_id   = None
-            matched_keyword    = None
+            matched_class_id = None
+            matched_keyword = None
 
             for keyword, (cls_name, cls_id) in keyword_to_class.items():
                 if keyword in class_words or id_str == keyword:
                     matched_class_name = cls_name
-                    matched_class_id   = cls_id
-                    matched_keyword    = keyword
+                    matched_class_id = cls_id
+                    matched_keyword = keyword
                     break
 
             if matched_class_name is not None:
@@ -593,8 +603,7 @@ def extract_annotations(
                     else:
                         x_c, y_c, w, h = yolo_coords
                         yolo_lines.append(
-                            f"{matched_class_id} "
-                            f"{x_c:.6f} {y_c:.6f} {w:.6f} {h:.6f}"
+                            f"{matched_class_id} {x_c:.6f} {y_c:.6f} {w:.6f} {h:.6f}"
                         )
                         stats["found"][matched_class_name] += 1
 
@@ -610,11 +619,12 @@ def extract_annotations(
 # Main processing pipeline
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def build_class_maps(
     dataset_config: dict,
 ) -> tuple[dict[str, int], dict[str, list[str]]]:
     """Build class_id_map and svg_class_tags from config."""
-    class_id_map   = {name: idx for idx, name in dataset_config["classes"].items()}
+    class_id_map = {name: idx for idx, name in dataset_config["classes"].items()}
     svg_class_tags = dataset_config["svg_class_tags"]
     return class_id_map, svg_class_tags
 
@@ -640,28 +650,28 @@ def process_split(
     Returns aggregate statistics for reporting.
     """
     agg_stats = {
-        "total_folders":  0,
+        "total_folders": 0,
         "skipped_no_img": 0,
         "skipped_no_ann": 0,
-        "total_found":    {cls: 0 for cls in class_id_map},
-        "total_skipped":  {cls: 0 for cls in class_id_map},
+        "total_found": {cls: 0 for cls in class_id_map},
+        "total_skipped": {cls: 0 for cls in class_id_map},
     }
 
     yolo_images_dir.mkdir(parents=True, exist_ok=True)
     yolo_labels_dir.mkdir(parents=True, exist_ok=True)
 
     for folder_str in tqdm(folder_list, desc=f"  {split_name}", unit="folder"):
-        folder    = Path(folder_str)
-        img_path  = folder / image_filename
-        svg_path  = folder / "model.svg"
+        folder = Path(folder_str)
+        img_path = folder / image_filename
+        svg_path = folder / "model.svg"
 
         # Generate a unique, collision-free filename
         # e.g. colorful/30 → "colorful_30_F1"
-        category    = folder.parent.name          # "colorful"
-        folder_name = folder.name                 # "30"
-        stem        = f"{category}_{folder_name}_F1"
+        category = folder.parent.name  # "colorful"
+        folder_name = folder.name  # "30"
+        stem = f"{category}_{folder_name}_F1"
 
-        out_img_path   = yolo_images_dir / f"{stem}.png"
+        out_img_path = yolo_images_dir / f"{stem}.png"
         out_label_path = yolo_labels_dir / f"{stem}.txt"
 
         # ── Skip if PNG is missing ────────────────────────────────────────
@@ -682,7 +692,11 @@ def process_split(
 
         # ── Extract annotations with actual image dimensions ──────────────
         yolo_lines, stats = extract_annotations(
-            svg_path, class_id_map, svg_class_tags,
+
+            svg_path,
+            class_id_map,
+            svg_class_tags,
+
             override_width=float(actual_w),
             override_height=float(actual_h),
         )
@@ -703,7 +717,7 @@ def process_split(
         # ── Accumulate stats ──────────────────────────────────────────────
         agg_stats["total_folders"] += 1
         for cls in class_id_map:
-            agg_stats["total_found"][cls]   += stats["found"].get(cls, 0)
+            agg_stats["total_found"][cls] += stats["found"].get(cls, 0)
             agg_stats["total_skipped"][cls] += stats["skipped"].get(cls, 0)
 
     return agg_stats
@@ -715,19 +729,21 @@ def print_conversion_report(all_stats: dict[str, dict], class_id_map: dict) -> N
     print("ANNOTATION CONVERSION COMPLETE")
     print("=" * 60)
 
-    total_folders  = sum(s["total_folders"]  for s in all_stats.values())
-    total_skipped  = sum(s["skipped_no_ann"] for s in all_stats.values())
+    total_folders = sum(s["total_folders"] for s in all_stats.values())
+    total_skipped = sum(s["skipped_no_ann"] for s in all_stats.values())
 
     for split, stats in all_stats.items():
-        print(f"\n  {split.upper()}: {stats['total_folders']} folders written"
-              f" ({stats['skipped_no_ann']} skipped — no annotations)")
+        print(
+            f"\n  {split.upper()}: {stats['total_folders']} folders written"
+            f" ({stats['skipped_no_ann']} skipped — no annotations)"
+        )
 
     print(f"\n  Total folders with labels: {total_folders}")
     print(f"  Total folders skipped:     {total_skipped}")
 
     print(f"\n  Annotations per class (train+val+test):")
     for cls in class_id_map:
-        found   = sum(s["total_found"].get(cls, 0)   for s in all_stats.values())
+        found = sum(s["total_found"].get(cls, 0) for s in all_stats.values())
         skipped = sum(s["total_skipped"].get(cls, 0) for s in all_stats.values())
         print(f"    {cls:<12} found={found:>6}  skipped={skipped:>4}")
 
@@ -741,12 +757,12 @@ def print_conversion_report(all_stats: dict[str, dict], class_id_map: dict) -> N
 def main():
     load_env()
 
-    dataset_config  = load_config("configs/dataset.yaml")
+    dataset_config = load_config("configs/dataset.yaml")
     class_id_map, svg_class_tags = build_class_maps(dataset_config)
-    image_filename  = dataset_config["cubicasa"]["image_filename"]
+    image_filename = dataset_config["cubicasa"]["image_filename"]
 
-    splits_dir      = Path("data/splits")
-    yolo_base       = Path("data/yolo_dataset")
+    splits_dir = Path("data/splits")
+    yolo_base = Path("data/yolo_dataset")
 
     logger.info("Starting annotation conversion...")
     logger.info(f"Target classes: {list(class_id_map.keys())}")
@@ -767,13 +783,13 @@ def main():
         logger.info(f"Processing {split_name}: {len(folder_list)} folders")
 
         stats = process_split(
-            split_name     = split_name,
-            folder_list    = folder_list,
-            image_filename = image_filename,
-            class_id_map   = class_id_map,
-            svg_class_tags = svg_class_tags,
-            yolo_images_dir = yolo_base / "images" / split_name,
-            yolo_labels_dir = yolo_base / "labels" / split_name,
+            split_name=split_name,
+            folder_list=folder_list,
+            image_filename=image_filename,
+            class_id_map=class_id_map,
+            svg_class_tags=svg_class_tags,
+            yolo_images_dir=yolo_base / "images" / split_name,
+            yolo_labels_dir=yolo_base / "labels" / split_name,
         )
         all_stats[split_name] = stats
 
