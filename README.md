@@ -10,11 +10,8 @@ floor plan images and export them as structured CAD-compatible vector files.
 
 ## Pipeline Overview
 
-![Floor Plan detection pipeline](workflow.png)
+![Floor Plan detection pipeline](data/images/workflow.png)
 
-Raw Floor Plans → Subset Selection → SVG→YOLO Conversion
-→ Image Preprocessing → YOLOv8 Training
-→ Evaluation → JSON/DXF Export
 
 ## Quick Start
 
