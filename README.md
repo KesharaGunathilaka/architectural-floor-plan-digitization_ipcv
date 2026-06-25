@@ -10,7 +10,7 @@ floor plan images and export them as structured CAD-compatible vector files.
 
 ## Pipeline Overview
 
-![Floor Plan detection pipeline](data/images/workflow.png)
+![Floor Plan detection pipeline](images/workflow.png)
 
 
 ## Quick Start
