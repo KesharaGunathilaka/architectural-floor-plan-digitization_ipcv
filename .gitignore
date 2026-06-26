@@ -26,6 +26,7 @@ ENV/
 
 # ── Model Weights & Training Artifacts ──────────────
 runs/
+models/
 *.pt
 *.pth
 *.onnx
