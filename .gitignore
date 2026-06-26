@@ -35,6 +35,7 @@ models/
 
 # ── Outputs ─────────────────────────────────────────
 outputs/*
+exports/*
 !outputs/.gitkeep
 logs/*
 !logs/.gitkeep
