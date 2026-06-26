@@ -19,13 +19,10 @@ ENV/
 .ipynb_checkpoints/
 *.ipynb_checkpoints
 
-# ── Data — never commit raw dataset or processed files
+# ── Data — never commit raw dataset, images, or processed files ──
+# Everything under data/ is a derived/machine-local artifact regenerated
+# by the src/data scripts (dataset_stats, select_subset, convert_annotations).
 /data/
-/data/raw/*
-/data/processed/*
-/data/yolo_dataset/images/
-/data/yolo_dataset/labels/
-!/data/**/.gitkeep
 
 # ── Model Weights & Training Artifacts ──────────────
 runs/

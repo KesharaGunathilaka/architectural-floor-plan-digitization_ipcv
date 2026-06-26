@@ -4,7 +4,7 @@ from ultralytics import YOLO
 # Resolve project root (two levels up from src/evaluation/)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
-model = YOLO(str(PROJECT_ROOT / "runs/detect/models/11l_final/weights/best.pt"))
+model = YOLO(str(PROJECT_ROOT / "models/final/best.pt"))
 
 # Predict on the entire test folder
 results = model.predict(

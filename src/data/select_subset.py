@@ -19,8 +19,10 @@ HOW TO RUN:
 
 REPRODUCIBILITY:
     This script uses seed=42 (from configs/dataset.yaml).
-    Running it again on any machine produces the same 500 folders.
-    The output JSON is committed to Git as part of the experiment record.
+    Running it again on the same dataset produces the identical subset.
+    The output JSON is a derived artifact (gitignored): it stores absolute
+    paths into your local CubiCasa5k folder, so it is regenerated per machine
+    rather than committed. Re-run this script to recreate it from the dataset.
 """
 
 import json
@@ -232,8 +234,8 @@ def print_final_summary(splits: dict[str, list[str]]) -> None:
         print(f"  {split:<8}: {len(folders):>4} folders  ({pct:.1f}%)")
     print(f"  {'TOTAL':<8}: {total:>4} folders")
     print("=" * 50)
-    print("\nOutput files:")
-    print("  data/splits/selected_folders.json  <- commit this to Git")
+    print("\nOutput files (gitignored — regenerable from the dataset):")
+    print("  data/splits/selected_folders.json")
     print("  data/splits/train.json")
     print("  data/splits/val.json")
     print("  data/splits/test.json")

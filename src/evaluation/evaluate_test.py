@@ -2,8 +2,8 @@ from ultralytics import YOLO
 
 
 # ── Which model to evaluate ──────────────────────────────────────────────────
-# Change this path when evaluating different training runs
-MODEL_WEIGHTS = "runs/detect/models/8l_final/weights/best.pt"
+# Canonical final model. Override this path to evaluate a different run.
+MODEL_WEIGHTS = "models/final/best.pt"
 
 # Class names for per-class reporting
 CLASS_NAMES = {

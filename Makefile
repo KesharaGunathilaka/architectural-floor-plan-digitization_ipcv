@@ -2,8 +2,9 @@
 # Usage: make <target>
 # Run `make help` to see all available commands.
 
-.PHONY: help install install-dev setup select-data convert preprocess \
-        train evaluate postprocess test lint clean sync-ubuntu
+.PHONY: help install install-dev setup audit-svg dataset-stats select-data \
+        convert verify preprocess train tune evaluate postprocess \
+        test lint clean sync-ubuntu
 
 # Default target
 help:
@@ -14,12 +15,14 @@ help:
 	@echo "  make install-dev    Install all dependencies (+ dev tools)"
 	@echo "  make setup          Full first-time setup"
 	@echo ""
-	@echo "  make select-data    Phase 1: Select dataset subset"
 	@echo "  make audit-svg      Phase 1: Audit SVG structure"
+	@echo "  make dataset-stats  Phase 1: Compute dataset statistics"
+	@echo "  make select-data    Phase 1: Select dataset subset"
 	@echo "  make convert        Phase 2: Convert SVG → YOLO labels"
 	@echo "  make verify         Phase 2: Verify annotations visually"
 	@echo "  make preprocess     Phase 3: Preprocess images"
 	@echo "  make train          Phase 5: Train the model"
+	@echo "  make tune           Phase 5: Hyperparameter tuning sweep"
 	@echo "  make evaluate       Phase 6: Evaluate on test set"
 	@echo "  make postprocess    Phase 7: Export detections to JSON/DXF"
 	@echo ""
@@ -45,11 +48,14 @@ setup: install-dev
 
 # ── Pipeline Stages ──────────────────────────────────────────────────────────
 
-select-data:
-	python src/data/select_subset.py
-
 audit-svg:
 	python src/data/audit_svg.py
+
+dataset-stats:
+	python src/data/dataset_stats.py
+
+select-data:
+	python src/data/select_subset.py
 
 convert:
 	python src/data/convert_annotations.py
@@ -61,13 +67,16 @@ preprocess:
 	python src/preprocessing/preprocess_pipeline.py
 
 train:
-	python src/training/train.py
+	python src/training/train_yolo.py
+
+tune:
+	python src/training/hyperparameter_tuning.py
 
 evaluate:
-	python src/evaluation/evaluate.py
+	python src/evaluation/evaluate_test.py
 
 postprocess:
-	python src/postprocessing/export.py
+	python src/export/export_cad.py
 
 # ── Quality Assurance ────────────────────────────────────────────────────────
 

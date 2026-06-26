@@ -49,9 +49,9 @@ def main():
         sys.exit(1)
     print(f"CUDA OK: {torch.cuda.get_device_name(0)} ({torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB)")
 
-    # Load the YOLOv11 Medium pre-trained model
-    print("Loading YOLOv26m model...")
-    model = YOLO("yolo26m.pt")
+    # Load the YOLOv11 Large pre-trained model (the project's final architecture)
+    print("Loading YOLO11l model...")
+    model = YOLO("yolo11l.pt")
 
     # Start training with hardware-specific constraints
     print("Starting training loop...")
@@ -91,13 +91,14 @@ def main():
         # --- EARLY STOPPING ---
         patience=40,  # Stop if no improvement for 40 epochs
         # --- LOGGING & SAVING ---
-        project="models",
-        name="yolo26m_final",
+        project="runs/detect/models",  # Matches the path the eval/export scripts read from
+        name="11l_final",
         save=True,
         save_period=10,  # Save a checkpoint every 10 epochs
     )
 
-    print("Training complete! Best weights are saved in models/yolo26m_final/weights/")
+    print("Training complete! Best weights are saved in runs/detect/models/11l_final/weights/")
+    print("To make it the canonical model, copy best.pt to models/final/best.pt")
 
 
 if __name__ == "__main__":

@@ -32,7 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from src.postprocessing.post_process import process_floorplan
 
 # ── Configuration ──────────────────────────────────────────────────────────
-MODEL_WEIGHTS = "runs/detect/models/11l_final/weights/best.pt"
+MODEL_WEIGHTS = "models/final/best.pt"
 OUTPUT_DIR = Path("runs/exports")
 DEFAULT_TEST_IMAGE = "data/yolo_dataset_processed/images/test/high_quality_architectural_10499_F1.png"
 
