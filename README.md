@@ -12,6 +12,18 @@ floor plan images and export them as structured CAD-compatible vector files.
 
 ![Floor Plan detection pipeline](images/workflow.png)
 
+Raw Floor Plans → SVG Audit → Dataset Statistics → Subset Selection →
+SVG→YOLO Conversion → Image Preprocessing → **YOLOv11l Training** →
+Evaluation → Post-Processing → JSON/DXF Export
+
+## Documentation
+
+| Doc | Contents |
+|-----|----------|
+| [docs/OVERVIEW.md](docs/OVERVIEW.md)   | Problem, architecture, classes, tech stack |
+| [docs/QUICKSTART.md](docs/QUICKSTART.md) | Install and run the pipeline end to end |
+| [docs/EVALUATION.md](docs/EVALUATION.md) | Metrics, results, per-class analysis |
+| [docs/svg_findings.md](docs/svg_findings.md) | How the CubiCasa SVG structure was decoded |
 
 ## Quick Start
 
@@ -78,10 +90,22 @@ tests/              Unit tests
 Final model: **YOLOv11l** (`models/final/best.pt`). Run `make evaluate` to
 regenerate test-set metrics.
 
-| Model    | mAP@50 | mAP@50-95 | Inference (ms) |
-|----------|--------|-----------|----------------|
-| YOLOv8l  | 0.812  | 0.549     | —              |
-| YOLOv11l | 0.838  | 0.571     | —              |
+| Model    | mAP@50 | mAP@50-95 |
+|----------|--------|-----------|
+| YOLOv8l  | 0.812  | 0.549     |
+| YOLOv11l | 0.838  | 0.571     |
 
 *Metrics are from the validation set during development; run `make evaluate`
-for final test-split numbers.*
+for final test-split numbers. Full per-class breakdown in
+[docs/EVALUATION.md](docs/EVALUATION.md).*
+
+## Team
+
+- **Tharun Umesh**
+- **Keshara Gunathilaka**
+- **Dilanka Hewage**
+- **Ashan Munasinghe**
+
+## License
+
+See [LICENSE](LICENSE).
